@@ -39,7 +39,7 @@ Un poco más sobre el proyecto:
 
 ## 🛠️ Tech Stack
 
-[![My Skills](https://skillicons.dev/icons?i=java,spring,maven,mssql,react,ts,tailwind,vite,git,github,figma,vscode,idea)](https://skillicons.dev)
+[![My Skills](https://skillicons.dev/icons?i=java,spring,mssql,react,ts,tailwind,vite,git,github,idea)](https://skillicons.dev)
 
 </div>
 
