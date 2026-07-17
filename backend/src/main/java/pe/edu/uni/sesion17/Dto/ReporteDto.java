@@ -16,5 +16,6 @@ public class ReporteDto {
     private double totalIngresos;
     private double totalGastos;
     private double saldo;
-    private List<ReporteCategoriaDto> categorias;
+    private List<ReporteCategoriaDto> categorias;          // desglose de gastos por categoría
+    private List<ReporteCategoriaDto> categoriasIngresos;  // desglose de ingresos por categoría
 }

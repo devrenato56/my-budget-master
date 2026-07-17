@@ -38,7 +38,7 @@ public class UsuarioRest {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody UsuarioDto bean) {
         try {
-            UsuarioDto resultado = usuarioService.login(bean.getEmail(), bean.getPassword());
+            UsuarioDto resultado = usuarioService.login(bean.getUsuario(), bean.getClave());
             return ResponseEntity.ok(resultado);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());

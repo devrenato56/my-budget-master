@@ -8,8 +8,8 @@ import lombok.*;
 @ToString
 @Builder
 public class GastoDto {
-    private int id_usuario;
-    private int id_categoria;
+    private int idUsuario;
+    private int idCategoria;
     private String fecha;         // "2025-11-15"
     private double monto;         // positivo (lo convertimos a negativo en el service)
     private String descripcion;
@@ -18,4 +18,3 @@ public class GastoDto {
     private String alertaUsuario;
     private String alertaCategoria;
 }
-

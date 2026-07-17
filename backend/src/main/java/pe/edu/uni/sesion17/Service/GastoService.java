@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pe.edu.uni.sesion17.Dto.GastoDto;
 
+import java.sql.Date;
 import java.time.LocalDate;
 
 @Service
@@ -23,8 +24,8 @@ public class GastoService {
     public GastoDto registrarGasto(GastoDto bean) {
 
         // ---------- VALIDACIONES ----------
-        validarUsuario(bean.getId_usuario());
-        validarCategoriaEgreso(bean.getId_categoria(), bean.getId_usuario());
+        validarUsuario(bean.getIdUsuario());
+        validarCategoriaEgreso(bean.getIdCategoria(), bean.getIdUsuario());
         validarMonto(bean.getMonto());
 
         // ---------- PREPARAR FECHA ----------
@@ -42,8 +43,8 @@ public class GastoService {
         """;
 
         jdbcTemplate.update(sql,
-                bean.getId_usuario(),
-                bean.getId_categoria(),
+                bean.getIdUsuario(),
+                bean.getIdCategoria(),
                 bean.getFecha(),
                 montoNegativo,
                 bean.getDescripcion()
@@ -51,8 +52,8 @@ public class GastoService {
 
         // ---------- ALERTAS ----------
         LocalDate f = LocalDate.parse(bean.getFecha());
-        bean.setAlertaUsuario(alertaGlobal(bean.getId_usuario(), f.getYear(), f.getMonthValue()));
-        bean.setAlertaCategoria(alertaCategoria(bean.getId_usuario(), bean.getId_categoria(), f.getYear(), f.getMonthValue()));
+        bean.setAlertaUsuario(alertaGlobal(bean.getIdUsuario(), f.getYear(), f.getMonthValue()));
+        bean.setAlertaCategoria(alertaCategoria(bean.getIdUsuario(), bean.getIdCategoria(), f.getYear(), f.getMonthValue()));
 
         return bean;
     }
@@ -106,19 +107,25 @@ public class GastoService {
     }
 
     /* =============================================================
-        ALERTAS (RF5)
+        ALERTAS Y CONTROL DE PRESUPUESTO (RF5)
+        Recalcula el acumulado del mes y sincroniza id_estado en
+        PRESUPUESTO / PRESUPUESTO_GLOBAL_MENSUAL (1=Dentro del límite,
+        2=Presupuesto excedido) cada vez que se registra un gasto.
     ============================================================= */
 
     private String alertaGlobal(int idUsuario, int año, int mes) {
 
+        Date fechaInicio = Date.valueOf(LocalDate.of(año, mes, 1));
+        Date fechaFin = Date.valueOf(LocalDate.of(año, mes, 1).plusMonths(1));
+
         String sqlGasto = """
             SELECT ISNULL(SUM(monto),0)
-            FROM TRANSACCION 
+            FROM TRANSACCION
             WHERE id_usuario = ? AND monto < 0
-            AND YEAR(fecha) = ? AND MONTH(fecha) = ?
+            AND fecha >= ? AND fecha < ?
         """;
 
-        double egresos = Math.abs(jdbcTemplate.queryForObject(sqlGasto, Double.class, idUsuario, año, mes));
+        double egresos = Math.abs(jdbcTemplate.queryForObject(sqlGasto, Double.class, idUsuario, fechaInicio, fechaFin));
 
         String sqlLimite = """
             SELECT monto_limite FROM PRESUPUESTO_GLOBAL_MENSUAL
@@ -132,7 +139,13 @@ public class GastoService {
             return "No hay presupuesto global definido.";
         }
 
-        if (egresos > limite)
+        boolean excedido = egresos > limite;
+        jdbcTemplate.update("""
+            UPDATE PRESUPUESTO_GLOBAL_MENSUAL SET id_estado = ?
+            WHERE id_usuario = ? AND año = ? AND mes = ?
+        """, excedido ? 2 : 1, idUsuario, año, mes);
+
+        if (excedido)
             return "⚠️ Excediste tu presupuesto mensual global.";
 
         return "Presupuesto global OK.";
@@ -140,14 +153,17 @@ public class GastoService {
 
     private String alertaCategoria(int idUsuario, int idCategoria, int año, int mes) {
 
+        Date fechaInicio = Date.valueOf(LocalDate.of(año, mes, 1));
+        Date fechaFin = Date.valueOf(LocalDate.of(año, mes, 1).plusMonths(1));
+
         String sqlCat = """
             SELECT ISNULL(SUM(monto),0)
-            FROM TRANSACCION 
+            FROM TRANSACCION
             WHERE id_usuario = ? AND id_categoria = ? AND monto < 0
-            AND YEAR(fecha) = ? AND MONTH(fecha) = ?
+            AND fecha >= ? AND fecha < ?
         """;
 
-        double egresos = Math.abs(jdbcTemplate.queryForObject(sqlCat, Double.class, idUsuario, idCategoria, año, mes));
+        double egresos = Math.abs(jdbcTemplate.queryForObject(sqlCat, Double.class, idUsuario, idCategoria, fechaInicio, fechaFin));
 
         String sqlLimite = """
             SELECT monto_limite FROM PRESUPUESTO
@@ -161,7 +177,13 @@ public class GastoService {
             return "No hay presupuesto definido para esta categoría.";
         }
 
-        if (egresos > limite)
+        boolean excedido = egresos > limite;
+        jdbcTemplate.update("""
+            UPDATE PRESUPUESTO SET id_estado = ?
+            WHERE id_usuario = ? AND id_categoria = ? AND año = ? AND mes = ?
+        """, excedido ? 2 : 1, idUsuario, idCategoria, año, mes);
+
+        if (excedido)
             return "⚠️ Excediste el presupuesto de esta categoría.";
 
         return "Categoría OK.";

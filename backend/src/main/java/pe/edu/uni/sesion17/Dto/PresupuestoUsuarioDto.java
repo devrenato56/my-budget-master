@@ -5,9 +5,10 @@ import lombok.Data;
 
 @Data
 public class PresupuestoUsuarioDto {
+    private int idPresupuestoGlobal;   // solo se completa al listar
     private int idUsuario;
     private int anio;
     private int mes;
-    private int montoLimite;
-    private int idEstado;  // Ejemplo: 1 = Activo, 0 = Inactivo
+    private double montoLimite;
+    private int idEstado;  // 1 = Dentro del límite, 2 = Presupuesto excedido
 }

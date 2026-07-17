@@ -29,6 +29,32 @@ public class CategoriasRest {
         }
     }
 
+    // Listar categorías de un usuario filtradas por tipo (1=Ingreso, 2=Gasto)
+    @GetMapping("/Usuario/{idUsuario}/Tipo/{idTipo}")
+    public ResponseEntity<?> listarCategoriasPorTipo(@PathVariable int idUsuario, @PathVariable int idTipo) {
+        try {
+            List<CategoriaDto> categorias = categoriaService.obtenerCategoriasPorTipo(idUsuario, idTipo);
+            return ResponseEntity.ok(categorias);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error interno al listar categorías por tipo.");
+        }
+    }
+
+    // Obtener una categoría específica
+    @GetMapping("/{idCategoria}/Usuario/{idUsuario}")
+    public ResponseEntity<?> obtenerCategoria(@PathVariable int idCategoria, @PathVariable int idUsuario) {
+        try {
+            CategoriaDto categoria = categoriaService.obtenerCategoriaPorId(idCategoria, idUsuario);
+            return ResponseEntity.ok(categoria);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error interno al obtener la categoría.");
+        }
+    }
+
     // Crear una nueva categoría
     @PostMapping("/Crear")
     public ResponseEntity<?> crearCategoria(@RequestBody CategoriaDto dto) {

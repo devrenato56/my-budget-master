@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import pe.edu.uni.sesion17.Dto.ReporteDto;
 import pe.edu.uni.sesion17.Dto.ReporteCategoriaDto;
 
+import java.sql.Date;
+import java.time.LocalDate;
 import java.time.Month;
 import java.time.format.TextStyle;
 import java.util.List;
@@ -37,6 +39,11 @@ public class ReporteService {
 
         validarUsuarioExistente(idUsuario);
 
+        // Rango de fechas [inicio, fin) en vez de YEAR()/MONTH() para que las
+        // consultas puedan usar el índice IX_TRANSACCION_USUARIO_FECHA (sargable).
+        Date fechaInicio = Date.valueOf(LocalDate.of(anio, mesInicio, 1));
+        Date fechaFin = Date.valueOf(LocalDate.of(anio, mesFin, 1).plusMonths(1));
+
         // ===========================
         // 1. Total ingresos
         // ===========================
@@ -45,15 +52,14 @@ public class ReporteService {
             FROM TRANSACCION t
             JOIN CATEGORIA c ON t.id_categoria = c.id_categoria
             WHERE t.id_usuario = ?
-              AND YEAR(t.fecha) = ?
-              AND MONTH(t.fecha) BETWEEN ? AND ?
+              AND t.fecha >= ? AND t.fecha < ?
               AND c.id_tipo = 1
         """;
 
         double ingresos = jdbcTemplate.queryForObject(
                 sqlIngresos,
                 Double.class,
-                idUsuario, anio, mesInicio, mesFin
+                idUsuario, fechaInicio, fechaFin
         );
 
         // ===========================
@@ -64,15 +70,14 @@ public class ReporteService {
             FROM TRANSACCION t
             JOIN CATEGORIA c ON t.id_categoria = c.id_categoria
             WHERE t.id_usuario = ?
-              AND YEAR(t.fecha) = ?
-              AND MONTH(t.fecha) BETWEEN ? AND ?
+              AND t.fecha >= ? AND t.fecha < ?
               AND c.id_tipo = 2
         """;
 
         double gastos = jdbcTemplate.queryForObject(
                 sqlGastos,
                 Double.class,
-                idUsuario, anio, mesInicio, mesFin
+                idUsuario, fechaInicio, fechaFin
         );
 
         // ===========================
@@ -89,8 +94,7 @@ public class ReporteService {
             FROM TRANSACCION t
             JOIN CATEGORIA c ON t.id_categoria = c.id_categoria
             WHERE t.id_usuario = ?
-              AND YEAR(t.fecha) = ?
-              AND MONTH(t.fecha) BETWEEN ? AND ?
+              AND t.fecha >= ? AND t.fecha < ?
               AND c.id_tipo = 2
             GROUP BY c.nombre
             ORDER BY total DESC
@@ -102,7 +106,31 @@ public class ReporteService {
                         .categoria(rs.getString("nombre"))
                         .monto(rs.getDouble("total"))
                         .build(),
-                idUsuario, anio, mesInicio, mesFin
+                idUsuario, fechaInicio, fechaFin
+        );
+
+        // ===========================
+        // 4b. Desglose de ingresos por categoría
+        // ===========================
+        String sqlDesgloseIngresos = """
+            SELECT c.nombre,
+                   ISNULL(SUM(t.monto),0) AS total
+            FROM TRANSACCION t
+            JOIN CATEGORIA c ON t.id_categoria = c.id_categoria
+            WHERE t.id_usuario = ?
+              AND t.fecha >= ? AND t.fecha < ?
+              AND c.id_tipo = 1
+            GROUP BY c.nombre
+            ORDER BY total DESC
+        """;
+
+        List<ReporteCategoriaDto> categoriasIngresos = jdbcTemplate.query(
+                sqlDesgloseIngresos,
+                (rs, rowNum) -> ReporteCategoriaDto.builder()
+                        .categoria(rs.getString("nombre"))
+                        .monto(rs.getDouble("total"))
+                        .build(),
+                idUsuario, fechaInicio, fechaFin
         );
 
         // ===========================
@@ -133,6 +161,7 @@ public class ReporteService {
                 .totalGastos(gastos)
                 .saldo(saldo)
                 .categorias(categorias)
+                .categoriasIngresos(categoriasIngresos)
                 .build();
     }
 

@@ -4,10 +4,12 @@ import lombok.Data;
 
 @Data
 public class PresupuestoCategoriaDto {
+    private int idPresupuesto;   // solo se completa al listar
     private int idUsuario;
     private int idCategoria;
+    private String nombreCategoria; // solo se completa al listar
     private int anio;
     private int mes;
-    private int montoLimite;
-    private int idEstado;  // Ejemplo: 1 = Activo, 0 = Inactivo
+    private double montoLimite;
+    private int idEstado;  // 1 = Dentro del límite, 2 = Presupuesto excedido
 }

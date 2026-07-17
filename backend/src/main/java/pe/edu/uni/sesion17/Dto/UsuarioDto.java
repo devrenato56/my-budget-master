@@ -8,6 +8,7 @@ public class UsuarioDto {
     private int idUsuario;
     private String nombre;
     private String email;
-    private String password;
-    private int activo;
+    private String telefono;
+    private String usuario;   // login (columna USUARIO.usuario)
+    private String clave;     // password (columna USUARIO.clave)
 }

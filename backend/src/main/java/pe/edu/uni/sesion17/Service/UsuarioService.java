@@ -4,6 +4,7 @@ package pe.edu.uni.sesion17.Service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,8 @@ public class UsuarioService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
     /**
      * Registrar nuevo usuario
      */
@@ -24,64 +27,71 @@ public class UsuarioService {
 
         validarNombre(bean.getNombre());
         validarEmail(bean.getEmail());
-        validarPassword(bean.getPassword());
+        validarUsuarioLogin(bean.getUsuario());
+        validarPassword(bean.getClave());
         validarNoExisteEmail(bean.getEmail());
+        validarNoExisteLogin(bean.getUsuario());
+
+        String claveHasheada = passwordEncoder.encode(bean.getClave());
 
         String sql = """
-                INSERT INTO USUARIO(nombre, email, password, activo)
-                VALUES (?, ?, ?, 1)
+                INSERT INTO USUARIO(nombre, email, telefono, usuario, clave)
+                VALUES (?, ?, ?, ?, ?)
         """;
 
         jdbcTemplate.update(sql,
                 bean.getNombre(),
                 bean.getEmail(),
-                bean.getPassword()
+                bean.getTelefono(),
+                bean.getUsuario(),
+                claveHasheada
         );
+
+        String sqlId = "SELECT id_usuario FROM USUARIO WHERE usuario = ?";
+        int idGenerado = jdbcTemplate.queryForObject(sqlId, Integer.class, bean.getUsuario());
+        bean.setIdUsuario(idGenerado);
+        bean.setClave(null);
 
         return bean;
     }
 
     /**
-     * Inicio de sesión
+     * Inicio de sesión (por login de usuario, no por email)
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public UsuarioDto login(String email, String password) {
+    public UsuarioDto login(String usuario, String clave) {
 
-        validarEmail(email);
-        validarPassword(password);
+        validarUsuarioLogin(usuario);
+        validarPassword(clave);
 
         String sql = """
-                SELECT id_usuario, nombre, email, password, activo
+                SELECT id_usuario, nombre, email, telefono, usuario, clave
                 FROM USUARIO
-                WHERE email = ?
+                WHERE usuario = ?
         """;
 
+        UsuarioDto encontrado;
         try {
-            return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
-
-                String passBD = rs.getString("password");
-
-                if (!passBD.equals(password)) {
-                    throw new RuntimeException("Contraseña incorrecta.");
-                }
-
-                if (rs.getInt("activo") == 0) {
-                    throw new RuntimeException("El usuario está desactivado.");
-                }
-
+            encontrado = jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
                 UsuarioDto dto = new UsuarioDto();
                 dto.setIdUsuario(rs.getInt("id_usuario"));
                 dto.setNombre(rs.getString("nombre"));
                 dto.setEmail(rs.getString("email"));
-                dto.setPassword(passBD);
-                dto.setActivo(rs.getInt("activo"));
+                dto.setTelefono(rs.getString("telefono"));
+                dto.setUsuario(rs.getString("usuario"));
+                dto.setClave(rs.getString("clave"));
                 return dto;
-
-            }, email);
-
+            }, usuario);
         } catch (Exception e) {
-            throw new RuntimeException("El email no está registrado.");
+            throw new RuntimeException("El usuario no está registrado.");
         }
+
+        if (!passwordEncoder.matches(clave, encontrado.getClave())) {
+            throw new RuntimeException("Contraseña incorrecta.");
+        }
+
+        encontrado.setClave(null);
+        return encontrado;
     }
 
 
@@ -111,7 +121,7 @@ public class UsuarioService {
 
 
     // ========================================================
-    // VALIDACIONES (MISMO ESTILO QUE RF5)
+    // VALIDACIONES
     // ========================================================
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -125,6 +135,13 @@ public class UsuarioService {
     private void validarEmail(String email) {
         if (email == null || !email.contains("@")) {
             throw new RuntimeException("El email no es válido.");
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    private void validarUsuarioLogin(String usuario) {
+        if (usuario == null || usuario.trim().isEmpty()) {
+            throw new RuntimeException("El usuario (login) no puede estar vacío.");
         }
     }
 
@@ -147,6 +164,21 @@ public class UsuarioService {
 
         if (cont > 0) {
             throw new RuntimeException("El email ya está registrado.");
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    private void validarNoExisteLogin(String usuario) {
+        String sql = """
+                SELECT COUNT(1)
+                FROM USUARIO
+                WHERE usuario = ?
+        """;
+
+        int cont = jdbcTemplate.queryForObject(sql, Integer.class, usuario);
+
+        if (cont > 0) {
+            throw new RuntimeException("El usuario (login) ya está registrado.");
         }
     }
 }

@@ -10,6 +10,7 @@ import pe.edu.uni.sesion17.Dto.PresupuestoCategoriaDto;
 import pe.edu.uni.sesion17.Dto.PresupuestoUsuarioDto;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class PresupuestoService {
@@ -88,6 +89,56 @@ public class PresupuestoService {
         return dto;
     }
 
+    /** Lista los presupuestos por categoría de un usuario (con nombre de categoría). */
+    public List<PresupuestoCategoriaDto> listarPresupuestosCategoria(int idUsuario) {
+        validarUsuario(idUsuario);
+
+        String sql = """
+            SELECT p.id_presupuesto, p.id_usuario, p.id_categoria, c.nombre AS nombre_categoria,
+                   p.año, p.mes, p.monto_limite, p.id_estado
+            FROM PRESUPUESTO p
+            JOIN CATEGORIA c ON p.id_categoria = c.id_categoria
+            WHERE p.id_usuario = ?
+            ORDER BY p.año DESC, p.mes DESC
+        """;
+
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            PresupuestoCategoriaDto dto = new PresupuestoCategoriaDto();
+            dto.setIdPresupuesto(rs.getInt("id_presupuesto"));
+            dto.setIdUsuario(rs.getInt("id_usuario"));
+            dto.setIdCategoria(rs.getInt("id_categoria"));
+            dto.setNombreCategoria(rs.getString("nombre_categoria"));
+            dto.setAnio(rs.getInt("año"));
+            dto.setMes(rs.getInt("mes"));
+            dto.setMontoLimite(rs.getDouble("monto_limite"));
+            dto.setIdEstado(rs.getInt("id_estado"));
+            return dto;
+        }, idUsuario);
+    }
+
+    /** Lista los presupuestos globales mensuales de un usuario. */
+    public List<PresupuestoUsuarioDto> listarPresupuestosGlobal(int idUsuario) {
+        validarUsuario(idUsuario);
+
+        String sql = """
+            SELECT id_presupuesto_global, id_usuario, año, mes, monto_limite, id_estado
+            FROM PRESUPUESTO_GLOBAL_MENSUAL
+            WHERE id_usuario = ?
+            ORDER BY año DESC, mes DESC
+        """;
+
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
+            PresupuestoUsuarioDto dto = new PresupuestoUsuarioDto();
+            dto.setIdPresupuestoGlobal(rs.getInt("id_presupuesto_global"));
+            dto.setIdUsuario(rs.getInt("id_usuario"));
+            dto.setAnio(rs.getInt("año"));
+            dto.setMes(rs.getInt("mes"));
+            dto.setMontoLimite(rs.getDouble("monto_limite"));
+            dto.setIdEstado(rs.getInt("id_estado"));
+            return dto;
+        }, idUsuario);
+    }
+
     // --- Validaciones ---
     @Transactional(propagation = Propagation.MANDATORY)
     private void validarUsuario(int idUsuario) {
@@ -108,7 +159,7 @@ public class PresupuestoService {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    private void validarMontoLimite(int monto) {
+    private void validarMontoLimite(double monto) {
         if (monto <= 0) throw new RuntimeException("El monto límite debe ser mayor a cero.");
     }
 
